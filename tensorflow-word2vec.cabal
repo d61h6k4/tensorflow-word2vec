@@ -1,0 +1,55 @@
+name:                tensorflow-word2vec
+version:             0.1.0.0
+-- synopsis:
+-- description:
+homepage:            https://github.com/githubuser/tensorflow-word2vec#readme
+license:             BSD3
+license-file:        LICENSE
+author:              Author name here
+maintainer:          example@example.com
+copyright:           2017 Author name here
+category:            Web
+build-type:          Simple
+extra-source-files:  README.md
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     TensorFlow.Examples.Text8.Parse
+  build-depends:       base >= 4.7 && < 5
+                     , vector >= 0.11
+                     , text
+                     , bytestring >= 0.10
+                     , path
+                     , path-io
+                     , zip
+  default-language:    Haskell2010
+
+executable tensorflow-word2vec-exe
+  hs-source-dirs:      app
+  main-is:             Main.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  build-depends:       base
+                     , text
+                     , tensorflow-text8-input-data
+                     , tensorflow-word2vec
+                     , containers >= 0.5
+                     , tensorflow
+                     , tensorflow-ops
+                     , tensorflow-core-ops
+                     , vector >= 0.11
+                     , nlp-utils
+  default-language:    Haskell2010
+
+test-suite tensorflow-word2vec-test
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Spec.hs
+  build-depends:       base
+                     , tensorflow-word2vec
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  default-language:    Haskell2010
+
+source-repository head
+  type:     git
+  location: https://github.com/githubuser/tensorflow-word2vec
