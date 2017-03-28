@@ -1,8 +1,10 @@
 {-# LANGUAGE OverloadedLists #-}
 module Main where
 
+import Control.Applicative (ZipList(..))
+import Data.Traversable (sequenceA)
 import Data.Int (Int32, Int64)
-import Data.List (genericLength)
+import Data.List (genericLength, tails)
 import Data.Text (Text)
 import Data.Vector (Vector)
 
@@ -37,12 +39,14 @@ esvd = do
          (TF.vector [numberOfTokens, numberOfTokens])
          values
          (TF.scalar 0))
-  uMatrix <-
+  embeddings <-
     TF.render
       (let (s, u, v) = TF.svd occurencesMatrix
-       in u)
-  embeddings <-
-    TF.render (TF.slice uMatrix (TF.vector [(0 :: Int32), 0]) (TF.vector [-1, 50]))
+           uPart =
+             TF.slice u (TF.vector [0, 0]) (TF.vector [numberOfTokens, 50])
+           vPart =
+             TF.slice v (TF.vector [0, 0]) (TF.vector [numberOfTokens, 50])
+       in TF.add uPart vPart)
   return
     Model
     { evaluate =
@@ -52,29 +56,34 @@ esvd = do
             embeddings
     }
 
-getSparseOccurencesMatrix :: [Text] -> Dictionary.Dictionary -> IO ([Vector Int], [Float])
-getSparseOccurencesMatrix text8tokens dictionary =
-  return . unzip . Map.toList . Map.fromListWith (+) =<<
-  mapM
-    (\(token, token') -> do
-       tid <- Dictionary.get token dictionary
-       tid' <- Dictionary.get token' dictionary
-       let token_x = maybe unkId id tid
-           token_y = maybe unkId id tid'
-       return (Vector.fromList [token_x, token_y], 1)
-       return (Vector.fromList [token_y, token_x], 1))
-    (zip text8tokens (tail text8tokens))
-  where
-    unkId = (fromIntegral numberOfTokens ) - 1
+getSparseOccurencesMatrix :: [[Int]] -> ([Vector Int], [Float])
+getSparseOccurencesMatrix =
+  unzip . Map.toList . Map.fromListWith (+) . map (flip (,) 1 . Vector.fromList)
 
+
+-- | Sliding window function.
+-- Implementation took from <SO http://stackoverflow.com/questions/27726739/implementing-an-efficient-sliding-window-algorithm-in-haskell>
+window :: Int -> [a] -> [[a]]
+window size = transpose' . take size . tails
+
+
+transpose' :: [[a]] -> [[a]]
+transpose' = getZipList . sequenceA . map ZipList
 
 main :: IO ()
 main = do
-  text8tokens <- readText8Tokens =<< text8Data
+  text8tokens' <- readText8Tokens =<< text8Data
+  text8tokens <- return (take 20000 text8tokens')
   dictionary <-
     Dictionary.filterExtremes 0 ((fromIntegral numberOfTokens) - 2) =<<
     Dictionary.addDocument text8tokens =<< Dictionary.new
-  (indices, values) <- getSparseOccurencesMatrix text8tokens dictionary
+  (indices, values) <-
+    return . getSparseOccurencesMatrix . window 2 =<<
+    mapM
+      (\token ->
+         Dictionary.get token dictionary >>=
+         return . maybe ((fromIntegral numberOfTokens) - 1) id)
+      text8tokens
   wordVectors <-
     TF.runSession
       (do let indicesTD =
@@ -89,4 +98,4 @@ main = do
           embeddings <- evaluate model indicesTD valuesTD
           return embeddings)
   print (Vector.length wordVectors)
-  mapM_ print (Vector.take 5 wordVectors)
+  mapM_ print (Vector.take 10 wordVectors)
