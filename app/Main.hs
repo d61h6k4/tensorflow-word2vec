@@ -73,17 +73,17 @@ transpose' = getZipList . sequenceA . map ZipList
 main :: IO ()
 main = do
   text8tokens' <- readText8Tokens =<< text8Data
-  text8tokens <- return (take 20000 text8tokens')
+  let text8tokens = (take 20000 text8tokens')
   dictionary <-
-    Dictionary.filterExtremes 0 ((fromIntegral numberOfTokens) - 2) =<<
+    Dictionary.filterExtremes 0 (fromIntegral numberOfTokens - 2) =<<
     Dictionary.addDocument text8tokens =<< Dictionary.new
   (indices, values) <-
-    return . getSparseOccurencesMatrix . window 2 =<<
+    fmap (getSparseOccurencesMatrix . window 2) (
     mapM
       (\token ->
          Dictionary.get token dictionary >>=
          return . maybe ((fromIntegral numberOfTokens) - 1) id)
-      text8tokens
+      text8tokens)
   wordVectors <-
     TF.runSession
       (do let indicesTD =
@@ -95,7 +95,6 @@ main = do
                   [genericLength indices]
                   (Vector.fromList values)
           model <- TF.build esvd
-          embeddings <- evaluate model indicesTD valuesTD
-          return embeddings)
+          evaluate model indicesTD valuesTD)
   print (Vector.length wordVectors)
   mapM_ print (Vector.take 10 wordVectors)
